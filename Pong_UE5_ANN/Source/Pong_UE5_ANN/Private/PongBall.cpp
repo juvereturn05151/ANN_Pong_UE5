@@ -14,16 +14,15 @@ APongBall::APongBall()
     BallMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BallMesh"));
     RootComponent = BallMesh;
 
-    // Set up physics
-    BallMesh->SetSimulatePhysics(true);
+    // Setup collision (no physics needed)
+    BallMesh->SetCollisionProfileName(FName("BlockAllDynamic"));
     BallMesh->SetEnableGravity(false);
-    BallMesh->SetConstraintMode(EDOFMode::XYPlane); // Lock to 2D plane
-    BallMesh->SetLinearDamping(0.0f); // No speed reduction over time
-    BallMesh->SetAngularDamping(0.1f); // Small rotation damping
+    BallMesh->SetSimulatePhysics(false);
 
-    // Enable collisions
-    BallMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-    BallMesh->SetCollisionProfileName(FName("PhysicsActor"));
+    // Create movement component
+    MovementComponent = CreateDefaultSubobject<UFloatingPawnMovement>(TEXT("MovementComponent"));
+    MovementComponent->UpdatedComponent = RootComponent;
+    MovementComponent->MaxSpeed = InitialSpeed;
 }
 
 void APongBall::BeginPlay()
@@ -36,25 +35,30 @@ void APongBall::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
     ConstrainTo2DPlane();
+
+    FVector NewLocation = GetActorLocation() + CurrentDirection * InitialSpeed * DeltaTime;
+    SetActorLocation(NewLocation);
 }
 
 void APongBall::ResetBall()
 {
-    // Reset position and velocity
+    // Reset position
     SetActorLocation(FVector::ZeroVector);
-    BallMesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
 
-    // Apply new impulse after short delay
-    FTimerHandle TimerHandle;
-    GetWorld()->GetTimerManager().SetTimer(TimerHandle, [this]()
-        {
-            // Random direction (left/right with slight vertical variation)
-            float DirectionX = FMath::RandBool() ? 1.0f : -1.0f;
-            float DirectionY = FMath::FRandRange(-0.3f, 0.3f);
+    OnCollidingWall();
+}
 
-            FVector Impulse = FVector(DirectionX * InitialSpeed, DirectionY * InitialSpeed, 0.0f);
-            BallMesh->AddImpulse(Impulse, NAME_None, true);
-        }, 1.0f, false); // 1 second delay
+void APongBall::OnCollidingWall()
+{   
+    // Set random direction (biased toward left/right)
+    CurrentDirection = FVector(
+        FMath::RandBool() ? 1.0f : -1.0f, // Strong horizontal bias
+        FMath::FRandRange(-0.3f, 0.3f),    // Slight vertical variation
+        0.0f
+    ).GetSafeNormal();
+
+    // Apply initial velocity
+    MovementComponent->Velocity = CurrentDirection * InitialSpeed;
 }
 
 void APongBall::ConstrainTo2DPlane()
@@ -65,5 +69,20 @@ void APongBall::ConstrainTo2DPlane()
     {
         Location.Z = 0.0f;
         SetActorLocation(Location, false, nullptr, ETeleportType::ResetPhysics);
+    }
+}
+
+void APongBall::SetCurrentDirection(FVector NewDirection)
+{
+    // Normalize the direction and ensure it's valid
+    NewDirection.Z = 0.0f; // Keep it 2D
+    if (NewDirection.SizeSquared() > 0.0f)
+    {
+        CurrentDirection = NewDirection.GetSafeNormal();
+        MovementComponent->Velocity = CurrentDirection * MovementComponent->GetMaxSpeed();
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Attempted to set invalid direction for PongBall"));
     }
 }

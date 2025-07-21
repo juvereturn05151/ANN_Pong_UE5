@@ -9,6 +9,8 @@
 /**
  * 
  */
+class ACameraActor;
+class APongBall;
 UCLASS()
 class PONG_UE5_ANN_API APongGameMode : public AGameModeBase
 {
@@ -24,6 +26,11 @@ protected:
     UFUNCTION(BlueprintCallable, Category = "Camera")
     void SetMainCamera(ACameraActor* NewCamera);
 
+    // Ball spawning
+    void SpawnGameBall();
+
+    UPROPERTY(EditDefaultsOnly, Category = "Gameplay")
+    TSubclassOf<APongBall> BallClass; // Assign this in Blueprint
 private:
     UPROPERTY()
     ACameraActor* MainCamera;

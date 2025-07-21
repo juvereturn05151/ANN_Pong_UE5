@@ -4,6 +4,7 @@
 #include "PongGameMode.h"
 #include "Camera/CameraActor.h"
 #include "Kismet/GameplayStatics.h"
+#include "PongBall.h"
 APongGameMode::APongGameMode()
 {
 
@@ -21,6 +22,9 @@ void APongGameMode::BeginPlay()
     {
         MainCamera = Cast<ACameraActor>(Cameras[0]);
         SetMainCamera(MainCamera);
+
+        // Spawn ball after camera is set
+        SpawnGameBall();
     }
 }
 
@@ -34,5 +38,31 @@ void APongGameMode::SetMainCamera(ACameraActor* NewCamera)
     if (PC)
     {
         PC->SetViewTargetWithBlend(MainCamera, 0.5f); // Smooth blend
+    }
+}
+
+void APongGameMode::SpawnGameBall()
+{
+    if (!BallClass) return;
+    if (!MainCamera) return;
+
+    // Get camera's center position in world space
+    FVector CameraLocation = MainCamera->GetActorLocation();
+    FRotator CameraRotation = MainCamera->GetActorRotation();
+    FVector SpawnLocation = CameraLocation;// +CameraRotation.Vector() * 500.0f; // Adjust distance as needed
+
+    // Spawn parameters
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+    // Spawn the ball
+    APongBall* Ball = GetWorld()->SpawnActor<APongBall>(BallClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+
+    // Optional: Adjust for 2D (set Z to 0)
+    if (Ball)
+    {
+        FVector NewLocation = Ball->GetActorLocation();
+        NewLocation.Z = 0.0f;
+        Ball->SetActorLocation(NewLocation);
     }
 }
